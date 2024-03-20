@@ -6,6 +6,9 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"os"
+	"os/signal"
+	"runtime/pprof"
 	"sort"
 	"sync"
 	"time"
@@ -213,7 +216,24 @@ func main() {
 	deltaStats = make(map[string]uint64)
 	sizeStats = make(map[string]uint64)
 	iface := flag.String("i", "eth0", "Interface to listen on")
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create("cpu.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+		c := make(chan os.Signal, 1024)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			<-c
+			pprof.StopCPUProfile()
+			os.Exit(0)
+		}()
+	}
 
 	handle, err := pcap.OpenLive(*iface, 72, false, 1000)
 	if err != nil {
