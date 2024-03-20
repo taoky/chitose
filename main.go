@@ -22,8 +22,10 @@ type InterfaceInfo struct {
 	IPs []net.IP
 }
 
+var deltaStats map[string]uint64
 var sizeStats map[string]uint64
 var statLock sync.Mutex
+var printTimestamp time.Time
 
 var boldStart = "\u001b[1m"
 var boldEnd = "\u001b[22m"
@@ -118,7 +120,12 @@ func printTopValues() {
 		}
 	}
 
+	duration := time.Since(printTimestamp)
+	printTimestamp = time.Now()
 	statLock.Lock()
+	for k, v := range deltaStats {
+		sizeStats[k] += v
+	}
 	for k := range sizeStats {
 		keys = append(keys, k)
 	}
@@ -129,6 +136,15 @@ func printTopValues() {
 	if len(keys) < top {
 		top = len(keys)
 	}
+
+	delta := make(map[string]uint64)
+	for i := 0; i < top; i++ {
+		key := keys[i]
+		delta[key] = deltaStats[key]
+	}
+	deltaStats = make(map[string]uint64)
+	statLock.Unlock()
+
 	for i := 0; i < top; i++ {
 		key := keys[i]
 		total := sizeStats[key]
@@ -139,12 +155,12 @@ func printTopValues() {
 			connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
 		}
 
-		fmt.Printf("%s%s: %s\n", key, connection, humanize.Bytes(total))
+		fmt.Printf("%s%s: %s (%s/s)\n", key, connection, humanize.Bytes(total), humanize.Bytes(delta[key]/uint64(duration.Seconds())))
 	}
-	statLock.Unlock()
 }
 
 func printStats() {
+	printTimestamp = time.Now()
 	for {
 		time.Sleep(5 * time.Second)
 		printTopValues()
@@ -187,13 +203,14 @@ func loop(info InterfaceInfo, packetSource *gopacket.PacketSource) {
 			destIPPrefix := getIPPrefixString(destIP)
 			// log.Printf("Outbound packet to %s, %d bytes\n", destIP, len)
 			statLock.Lock()
-			sizeStats[destIPPrefix] += uint64(len)
+			deltaStats[destIPPrefix] += uint64(len)
 			statLock.Unlock()
 		}
 	}
 }
 
 func main() {
+	deltaStats = make(map[string]uint64)
 	sizeStats = make(map[string]uint64)
 	iface := flag.String("i", "eth0", "Interface to listen on")
 	flag.Parse()
