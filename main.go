@@ -12,6 +12,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
@@ -124,12 +125,21 @@ func loop(info InterfaceInfo, packetSource *gopacket.PacketSource) {
 
 		out := isOutbound(info, linkFlow, networkFlow)
 		if out {
-			destStr := networkFlow.Dst().String()
-			destIP, err := netip.ParseAddr(destStr)
-			if err != nil {
-				log.Printf("Error parsing destination IP '%s': %s\n", destStr, err)
+			var destIP netip.Addr
+			len := 0
+			if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
+				ip, _ := ipLayer.(*layers.IPv4)
+				destIP, _ = netip.AddrFromSlice(ip.DstIP)
+				len = int(ip.Length) + 40
 			}
-			len := len(packet.Data())
+			if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
+				ip, _ := ipLayer.(*layers.IPv6)
+				destIP, _ = netip.AddrFromSlice(ip.DstIP)
+				len = int(ip.Length) + 40
+			}
+			if len == 0 {
+				continue
+			}
 			destIPPrefix := getIPPrefixString(destIP)
 			// log.Printf("Outbound packet to %s, %d bytes\n", destIP, len)
 			statLock.Lock()
