@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cakturk/go-netstat/netstat"
 	"github.com/dustin/go-humanize"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -23,6 +24,9 @@ type InterfaceInfo struct {
 
 var sizeStats map[string]uint64
 var statLock sync.Mutex
+
+var boldStart = "\u001b[1m"
+var boldEnd = "\u001b[22m"
 
 func getInterfaceAddrs(ifaceName string) (info InterfaceInfo, err error) {
 	info = InterfaceInfo{}
@@ -81,6 +85,39 @@ func getIPPrefixString(ip netip.Addr) string {
 
 func printTopValues() {
 	var keys []string
+	activeConn := make(map[string]int)
+
+	// netstat
+	// Get active connections
+	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Established
+	})
+	if err != nil {
+		log.Printf("netstat error: %v", err)
+	} else {
+		for _, tab := range tabs {
+			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+			if !ok {
+				continue
+			}
+			activeConn[getIPPrefixString(ip)] += 1
+		}
+	}
+	tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+		return s.State == netstat.Established
+	})
+	if err != nil {
+		log.Printf("netstat error: %v", err)
+	} else {
+		for _, tab := range tabs {
+			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+			if !ok {
+				continue
+			}
+			activeConn[getIPPrefixString(ip)] += 1
+		}
+	}
+
 	statLock.Lock()
 	for k := range sizeStats {
 		keys = append(keys, k)
@@ -95,7 +132,14 @@ func printTopValues() {
 	for i := 0; i < top; i++ {
 		key := keys[i]
 		total := sizeStats[key]
-		fmt.Printf("%s: %s\n", key, humanize.Bytes(total))
+
+		connection := ""
+		if _, ok := activeConn[key]; ok {
+			activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
+			connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
+		}
+
+		fmt.Printf("%s%s: %s\n", key, connection, humanize.Bytes(total))
 	}
 	statLock.Unlock()
 }

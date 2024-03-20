@@ -25,4 +25,5 @@ You might need root privilege to run this program.
 
 ## Naming
 
-Same as the nginx log analyzer [ayano](https://github.com/taoky/ayano) :)
+Same as the nginx log analyzer [ayano](https://github.com/taoky/ayano),
+and chitose shares some code with that :)
