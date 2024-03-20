@@ -119,7 +119,7 @@ func loop(info InterfaceInfo, packetSource *gopacket.PacketSource) {
 		if networkLayer != nil {
 			networkFlow = networkLayer.NetworkFlow()
 		} else {
-			log.Fatal("No network layer found in packet")
+			continue
 		}
 
 		out := isOutbound(info, linkFlow, networkFlow)
