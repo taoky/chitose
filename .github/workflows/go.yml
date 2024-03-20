@@ -26,6 +26,7 @@ jobs:
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep ensure
         fi
+        sudo apt-get install -y libpcap-dev
     - name: Test
       run: |
         go test -race ./... && go vet ./...
