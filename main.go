@@ -22,6 +22,8 @@ type InterfaceInfo struct {
 	IPs []net.IP
 }
 
+var noNetstat *bool
+
 var deltaStats map[string]uint64
 var sizeStats map[string]uint64
 var statLock sync.Mutex
@@ -89,34 +91,35 @@ func printTopValues() {
 	var keys []string
 	activeConn := make(map[string]int)
 
-	// netstat
-	// Get active connections
-	tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
-		return s.State == netstat.Established
-	})
-	if err != nil {
-		log.Printf("netstat error: %v", err)
-	} else {
-		for _, tab := range tabs {
-			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-			if !ok {
-				continue
+	if !*noNetstat {
+		// Get active connections
+		tabs, err := netstat.TCPSocks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[getIPPrefixString(ip)] += 1
 			}
-			activeConn[getIPPrefixString(ip)] += 1
 		}
-	}
-	tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
-		return s.State == netstat.Established
-	})
-	if err != nil {
-		log.Printf("netstat error: %v", err)
-	} else {
-		for _, tab := range tabs {
-			ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
-			if !ok {
-				continue
+		tabs, err = netstat.TCP6Socks(func(s *netstat.SockTabEntry) bool {
+			return s.State == netstat.Established
+		})
+		if err != nil {
+			log.Printf("netstat error: %v", err)
+		} else {
+			for _, tab := range tabs {
+				ip, ok := netip.AddrFromSlice(tab.RemoteAddr.IP)
+				if !ok {
+					continue
+				}
+				activeConn[getIPPrefixString(ip)] += 1
 			}
-			activeConn[getIPPrefixString(ip)] += 1
 		}
 	}
 
@@ -150,9 +153,11 @@ func printTopValues() {
 		total := sizeStats[key]
 
 		connection := ""
-		if _, ok := activeConn[key]; ok {
-			activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
-			connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
+		if !*noNetstat {
+			if _, ok := activeConn[key]; ok {
+				activeString := fmt.Sprintf(" (active, %d)", activeConn[key])
+				connection = fmt.Sprintf("%s%s%s", boldStart, activeString, boldEnd)
+			}
 		}
 
 		fmt.Printf("%s%s: %s (%s/s)\n", key, connection, humanize.Bytes(total), humanize.Bytes(delta[key]/uint64(duration.Seconds())))
@@ -213,6 +218,7 @@ func main() {
 	deltaStats = make(map[string]uint64)
 	sizeStats = make(map[string]uint64)
 	iface := flag.String("i", "eth0", "Interface to listen on")
+	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
 	flag.Parse()
 
 	handle, err := pcap.OpenLive(*iface, 72, false, 1000)
