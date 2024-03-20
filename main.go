@@ -88,6 +88,9 @@ func printTopValues() {
 		return sizeStats[keys[i]] > sizeStats[keys[j]]
 	})
 	top := 10
+	if len(keys) < top {
+		top = len(keys)
+	}
 	for i := 0; i < top; i++ {
 		key := keys[i]
 		total := sizeStats[key]
@@ -158,6 +161,7 @@ func main() {
 	}
 
 	linkType := handle.LinkType()
+	log.Printf("Handle link type: %s (%d)\n", linkType.String(), linkType)
 
 	packetSource := gopacket.NewPacketSource(handle, linkType)
 	// totalBytes := 0
