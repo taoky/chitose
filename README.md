@@ -11,6 +11,9 @@ go build
 ```
 
 This uses gopacket and thus NOT supporting `CGO_ENABLED=0` for static linking.
+You need to install libpcap to use this.
+
+Note that binaries in Releases are compiled under Ubuntu 20.04 (glibc 2.31).
 
 ## Usage
 
@@ -27,3 +30,4 @@ You might need root privilege to run this program.
 
 Same as the nginx log analyzer [ayano](https://github.com/taoky/ayano),
 and chitose shares some code with that :)
+
