@@ -22,6 +22,8 @@ Note that binaries in Releases are compiled under Ubuntu 20.04 (glibc 2.31).
 Usage of ./chitose:
   -i string
         Interface to listen on (default "eth0")
+  -no-netstat
+        Do not detect active connections
 ```
 
 You might need root privilege to run this program.
