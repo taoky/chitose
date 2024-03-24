@@ -160,7 +160,7 @@ func printTopValues() {
 			}
 		}
 
-		fmt.Printf("%s%s: %s (%s/s)\n", key, connection, humanize.Bytes(total), humanize.Bytes(delta[key]/uint64(duration.Seconds())))
+		fmt.Printf("%s%s: %s (%s/s)\n", key, connection, humanize.IBytes(total), humanize.IBytes(delta[key]/uint64(duration.Seconds())))
 	}
 }
 
