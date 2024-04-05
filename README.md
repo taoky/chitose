@@ -2,7 +2,7 @@
 
 An iftop alternative for cumulated network traffic monitoring, for OSS mirror admins.
 
-**Outbound traffic only currently**.
+**Outbound traffic by default**.
 
 ## Build
 
@@ -22,6 +22,8 @@ Note that binaries in Releases are compiled under Ubuntu 20.04 (glibc 2.31).
 Usage of ./chitose:
   -i string
         Interface to listen on (default "eth0")
+  -inbound
+        Show inbound traffic instead of outbound
   -no-netstat
         Do not detect active connections
 ```

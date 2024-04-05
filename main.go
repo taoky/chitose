@@ -23,6 +23,7 @@ type InterfaceInfo struct {
 }
 
 var noNetstat *bool
+var useInbound *bool
 
 var deltaStats map[string]uint64
 var sizeStats map[string]uint64
@@ -189,26 +190,34 @@ func loop(info InterfaceInfo, packetSource *gopacket.PacketSource) {
 		}
 
 		out := isOutbound(info, linkFlow, networkFlow)
-		if out {
-			var destIP netip.Addr
+		if (out && !*useInbound) || (!out && *useInbound) {
+			var resIP netip.Addr
 			len := 0
 			if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 				ip, _ := ipLayer.(*layers.IPv4)
-				destIP, _ = netip.AddrFromSlice(ip.DstIP)
+				if !*useInbound {
+					resIP, _ = netip.AddrFromSlice(ip.DstIP)
+				} else {
+					resIP, _ = netip.AddrFromSlice(ip.SrcIP)
+				}
 				len = int(ip.Length) + 40
 			}
 			if ipLayer := packet.Layer(layers.LayerTypeIPv6); ipLayer != nil {
 				ip, _ := ipLayer.(*layers.IPv6)
-				destIP, _ = netip.AddrFromSlice(ip.DstIP)
+				if !*useInbound {
+					resIP, _ = netip.AddrFromSlice(ip.DstIP)
+				} else {
+					resIP, _ = netip.AddrFromSlice(ip.SrcIP)
+				}
 				len = int(ip.Length) + 40
 			}
 			if len == 0 {
 				continue
 			}
-			destIPPrefix := getIPPrefixString(destIP)
+			resIPPrefix := getIPPrefixString(resIP)
 			// log.Printf("Outbound packet to %s, %d bytes\n", destIP, len)
 			statLock.Lock()
-			deltaStats[destIPPrefix] += uint64(len)
+			deltaStats[resIPPrefix] += uint64(len)
 			statLock.Unlock()
 		}
 	}
@@ -219,6 +228,7 @@ func main() {
 	sizeStats = make(map[string]uint64)
 	iface := flag.String("i", "eth0", "Interface to listen on")
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
+	useInbound = flag.Bool("inbound", false, "Show inbound traffic instead of outbound")
 	flag.Parse()
 
 	handle, err := pcap.OpenLive(*iface, 72, false, 1000)
