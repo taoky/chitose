@@ -36,6 +36,10 @@ Press 's' (lowercase) to change sort order
 
 You might need root privilege to run this program.
 
+## Alternative
+
+[iBug's ctmon](https://github.com/iBug/goGadgets/tree/master/ctmon) uses conntrack instead of pcap to monitor, which is a more lightweight solution.
+
 ## Naming
 
 Same as the nginx log analyzer [ayano](https://github.com/taoky/ayano),
