@@ -26,6 +26,12 @@ Usage of ./chitose:
         Show inbound traffic instead of outbound
   -no-netstat
         Do not detect active connections
+  -sort-delta
+        Sort by delta instead of total
+  -top int
+        Number of top values to show (default 10)
+
+Press 's' (lowercase) to change sort order
 ```
 
 You might need root privilege to run this program.

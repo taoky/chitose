@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"os"
 	"sort"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ type InterfaceInfo struct {
 	IPs []net.IP
 }
 
+var topShow *int
+
 var noNetstat *bool
 var useInbound *bool
 
@@ -32,6 +35,9 @@ var printTimestamp time.Time
 
 var boldStart = "\u001b[1m"
 var boldEnd = "\u001b[22m"
+
+var sortByTotal = true
+var sortByTotalMutex sync.Mutex
 
 func getInterfaceAddrs(ifaceName string) (info InterfaceInfo, err error) {
 	info = InterfaceInfo{}
@@ -133,10 +139,23 @@ func printTopValues() {
 	for k := range sizeStats {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		return sizeStats[keys[i]] > sizeStats[keys[j]]
-	})
-	top := 10
+
+	sortByTotalMutex.Lock()
+	localSortByTotal := sortByTotal
+	sortByTotalMutex.Unlock()
+
+	if localSortByTotal {
+		sort.Slice(keys, func(i, j int) bool {
+			return sizeStats[keys[i]] > sizeStats[keys[j]]
+		})
+	} else {
+		// sort by delta
+		sort.Slice(keys, func(i, j int) bool {
+			return deltaStats[keys[i]] > deltaStats[keys[j]]
+		})
+	}
+
+	top := *topShow
 	if len(keys) < top {
 		top = len(keys)
 	}
@@ -223,13 +242,57 @@ func loop(info InterfaceInfo, packetSource *gopacket.PacketSource) {
 	}
 }
 
+func handleRawInput() {
+	oldState, err := makeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if oldState == nil {
+		return
+	}
+	defer restore(int(os.Stdin.Fd()), oldState)
+
+	// reader := term.NewTerminal(os.Stdin, "")
+	b := make([]byte, 1)
+	for {
+		// ch, err := reader.ReadLine()
+		_, err := os.Stdin.Read(b)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		// s => change sort order
+		if b[0] == byte('s') {
+			sortByTotalMutex.Lock()
+			sortByTotal = !sortByTotal
+			sortByTotalMutex.Unlock()
+			fmt.Printf("Sorting by %s\n", func() string {
+				if sortByTotal {
+					return "total"
+				}
+				return "delta"
+			}())
+		}
+	}
+}
+
 func main() {
 	deltaStats = make(map[string]uint64)
 	sizeStats = make(map[string]uint64)
 	iface := flag.String("i", "eth0", "Interface to listen on")
+	topShow = flag.Int("top", 10, "Number of top values to show")
 	noNetstat = flag.Bool("no-netstat", false, "Do not detect active connections")
 	useInbound = flag.Bool("inbound", false, "Show inbound traffic instead of outbound")
+	sortDelta := flag.Bool("sort-delta", false, "Sort by delta instead of total")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Println()
+		fmt.Println("Press 's' (lowercase) to change sort order")
+	}
 	flag.Parse()
+	sortByTotal = !*sortDelta
 
 	handle, err := pcap.OpenLive(*iface, 72, false, 1000)
 	if err != nil {
@@ -254,6 +317,7 @@ func main() {
 	// totalBytes := 0
 
 	fmt.Println("Starting...")
+	go handleRawInput()
 	go printStats()
 	loop(ifaceInfo, packetSource)
 }
